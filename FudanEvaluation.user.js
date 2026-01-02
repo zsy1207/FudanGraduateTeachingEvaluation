@@ -585,9 +585,8 @@
             </style>
             <div class="minimize-btn" id="minimize-panel">-</div>
             <h3>复旦评教助手</h3>
-            <button class="btn-primary" id="btn-fill-all">填充当前 (完全同意)</button>
             <button class="btn-primary" id="btn-auto-all">自动完成全部</button>
-            <button class="btn-secondary" id="btn-submit">提交当前</button>
+            <button class="btn-secondary" id="btn-fill-all">填充当前</button>
             <button class="btn-danger" id="btn-close">关闭面板</button>
             <div class="status" id="eval-status">就绪</div>
         `;
@@ -595,21 +594,15 @@
         document.body.appendChild(panel);
 
         // Event listeners - 事件监听
-        document.getElementById('btn-fill-all').addEventListener('click', async () => {
-            updateStatus('正在填充...');
-            const count = selectAllTotallyAgree();
-            updateStatus(`已填充 ${count} 项`);
-        });
-
         document.getElementById('btn-auto-all').addEventListener('click', async () => {
             updateStatus('自动处理中...');
             await processAllCourses();
         });
 
-        document.getElementById('btn-submit').addEventListener('click', async () => {
-            updateStatus('正在提交...');
-            const success = await submitForm();
-            updateStatus(success ? '提交成功！' : '提交失败');
+        document.getElementById('btn-fill-all').addEventListener('click', async () => {
+            updateStatus('正在填充...');
+            const count = selectAllTotallyAgree();
+            updateStatus(`已填充 ${count} 项`);
         });
 
         document.getElementById('btn-close').addEventListener('click', () => {

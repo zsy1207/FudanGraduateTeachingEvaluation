@@ -75,75 +75,46 @@
     // Core Functions
     // ===========================================
 
-    // Get all unevaluated course cards
+    // Get all unevaluated course cards - 获取所有未评教课程卡片
     function getUnevaluatedCourses() {
         const unevaluated = [];
 
-        // Method 1: Find by "未评教" text in various container patterns
-        const allElements = document.querySelectorAll('*');
-        const cardContainers = new Set();
-
-        allElements.forEach(el => {
-            if (el.textContent.includes('未评教') && !el.textContent.includes('已评教')) {
-                // Find the clickable parent card
-                let parent = el.parentElement;
-                let maxDepth = 10;
-                while (parent && maxDepth > 0) {
-                    // Check if this is a clickable card element
-                    if (parent.onclick ||
-                        parent.classList.contains('pj-card') ||
-                        parent.classList.contains('wspj-card') ||
-                        parent.classList.contains('course-card') ||
-                        parent.getAttribute('data-wid') ||
-                        parent.style.cursor === 'pointer') {
-                        cardContainers.add(parent);
-                        break;
-                    }
-                    // Check for click event listener
-                    if (parent.tagName === 'DIV' && parent.className.includes('card')) {
-                        cardContainers.add(parent);
-                        break;
-                    }
-                    parent = parent.parentElement;
-                    maxDepth--;
-                }
+        // 方法1：使用精确的选择器 (基于实际页面结构)
+        // 课程卡片: div.bh-card[data-action="评教"]
+        const cards = document.querySelectorAll('.bh-card[data-action="评教"]');
+        cards.forEach(card => {
+            // 检查是否包含"未评教"标签 (sc-panel-warning 类)
+            const warningBadge = card.querySelector('.sc-panel-warning, .sc-panel-diagonalStrips-bar');
+            if (warningBadge && warningBadge.textContent.includes('未评教')) {
+                unevaluated.push(card);
             }
         });
 
-        // Method 2: Find by common class patterns
-        const cardSelectors = [
-            '.pj-card:not(.pj-card-done)',
-            '.wspj-card:not(.done)',
-            '.course-item:not(.evaluated)',
-            '[class*="card"]:not([class*="done"]):not([class*="finish"])',
-            '.bh-card'
-        ];
+        log(`方法1: 找到 ${unevaluated.length} 张卡片`);
 
-        for (const selector of cardSelectors) {
-            try {
-                const cards = document.querySelectorAll(selector);
-                cards.forEach(card => {
-                    if (card.textContent.includes('未评教')) {
-                        cardContainers.add(card);
-                    }
-                });
-            } catch (e) {
-                // Selector might be invalid
-            }
+        // 方法2：备选 - 查找所有bh-card并检查内容
+        if (unevaluated.length === 0) {
+            const allCards = document.querySelectorAll('.bh-card');
+            allCards.forEach(card => {
+                if (card.textContent.includes('未评教') && !card.textContent.includes('已评教')) {
+                    unevaluated.push(card);
+                }
+            });
+            log(`方法2: 找到 ${unevaluated.length} 张卡片`);
         }
 
-        // Method 3: Find div elements with course info that haven't been evaluated
-        const coursePatterns = document.querySelectorAll('div[class*="pj"], div[class*="card"], li[class*="item"]');
-        coursePatterns.forEach(el => {
-            if (el.textContent.includes('未评教') &&
-                el.offsetParent !== null && // Visible
-                el.offsetHeight > 30) { // Has reasonable size
-                cardContainers.add(el);
-            }
-        });
+        // 方法3：再备选 - 通过data-wjwid属性查找
+        if (unevaluated.length === 0) {
+            const wjCards = document.querySelectorAll('[data-wjwid]');
+            wjCards.forEach(card => {
+                if (card.textContent.includes('未评教')) {
+                    unevaluated.push(card);
+                }
+            });
+            log(`方法3: 找到 ${unevaluated.length} 张卡片`);
+        }
 
-        unevaluated.push(...cardContainers);
-        log(`Found ${unevaluated.length} unevaluated courses`);
+        log(`总共找到 ${unevaluated.length} 门未评教课程`);
         return unevaluated;
     }
 
@@ -418,17 +389,16 @@
         return false;
     }
 
-    // Process all courses automatically
+    // Process all courses automatically - 自动处理所有课程
     async function processAllCourses() {
         log('开始自动评教流程');
         updateStatus('正在处理...');
 
-        // Check if we're on the course list page
+        // 确保在课程列表页面
         const isOnListPage = window.location.hash === '#/wspj' || window.location.hash.includes('wspj');
 
         if (!isOnListPage) {
             log('不在课程列表页面，尝试导航');
-            // Try to go to course list
             const listLink = document.querySelector('a[href*="wspj"]') ||
                            Array.from(document.querySelectorAll('a')).find(a => a.textContent.includes('网上评教'));
             if (listLink) {
@@ -440,13 +410,13 @@
         await sleep(CONFIG.PAGE_LOAD_DELAY);
 
         let processedCount = 0;
-        let maxIterations = 50; // Safety limit
+        let maxIterations = 50;
         let consecutiveFailures = 0;
 
         while (maxIterations > 0 && consecutiveFailures < 3) {
             maxIterations--;
 
-            // Get unevaluated courses
+            // 获取未评教课程
             const courses = getUnevaluatedCourses();
             log(`发现 ${courses.length} 门未评教课程`);
 
@@ -455,17 +425,35 @@
                 break;
             }
 
-            // Click on first unevaluated course
-            const courseName = courses[0].textContent.substring(0, 30).replace(/\s+/g, ' ').trim();
+            // 获取课程名称用于显示
+            const courseContent = courses[0].querySelector('.pjwj_card_content, .sc-panel-diagonalStrips-text');
+            const courseName = courseContent ? courseContent.textContent.trim() : courses[0].textContent.substring(0, 30).replace(/\s+/g, ' ').trim();
+
             log(`正在处理: ${courseName}...`);
-            updateStatus(`正在处理: ${courseName.substring(0, 15)}...`);
+            updateStatus(`正在处理: ${courseName.substring(0, 10)}...`);
 
-            courses[0].click();
+            // 触发点击事件 - 使用 dispatchEvent 确保事件被正确处理
+            const clickEvent = new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            });
+            courses[0].dispatchEvent(clickEvent);
 
-            // Wait for form to open
-            await sleep(CONFIG.PAGE_LOAD_DELAY + 500);
+            // 等待表单加载
+            await sleep(CONFIG.PAGE_LOAD_DELAY + 1000);
 
-            // Process the form
+            // 检查表单是否已打开
+            const formOpened = document.body.innerHTML.includes('完全同意') ||
+                              document.querySelector('.bh-paper-pile-dialog');
+
+            if (!formOpened) {
+                log('表单未打开，尝试再次点击');
+                courses[0].click();
+                await sleep(CONFIG.PAGE_LOAD_DELAY);
+            }
+
+            // 处理表单
             const success = await processSingleCourse();
 
             if (success) {
@@ -476,11 +464,11 @@
             } else {
                 consecutiveFailures++;
                 log(`处理失败 (${consecutiveFailures}/3)`);
-                // Try to close any open dialog
+                // 尝试关闭可能打开的对话框
                 await closeForm();
             }
 
-            // Wait before next iteration
+            // 等待页面稳定
             await sleep(CONFIG.NEXT_COURSE_DELAY);
         }
 

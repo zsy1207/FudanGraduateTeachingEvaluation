@@ -1,3 +1,4 @@
+## greasyfork链接：https://greasyfork.org/zh-CN/scripts/561134
 # 复旦研究生评教助手
 
 一个用于自动填充复旦大学研究生课程评教表单的油猴脚本。

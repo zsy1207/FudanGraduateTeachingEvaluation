@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         复旦研究生评教助手
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.5
 // @description  自动填充课程评教表单，一键完成所有课程评教（全选"完全同意"）
 // @author       zsy1207
 // @match        https://yzsfwapp.fudan.edu.cn/gsapp/sys/wspjappfudan/*

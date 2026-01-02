@@ -14,19 +14,21 @@
     'use strict';
 
     // ===========================================
-    // Configuration
+    // Configuration - 配置项
     // ===========================================
     const CONFIG = {
-        // Delay between operations (ms)
-        CLICK_DELAY: 300,
-        SUBMIT_DELAY: 500,
-        NEXT_COURSE_DELAY: 1000,
-        PAGE_LOAD_DELAY: 1500,
+        // 操作延迟时间 (毫秒)
+        CLICK_DELAY: 100,        // 每次点击选项的间隔
+        FILL_COMPLETE_DELAY: 2000, // 填充完成后等待时间（确保所有选项都已选中）
+        SUBMIT_DELAY: 800,       // 提交后等待时间
+        CONFIRM_DELAY: 1000,     // 确认对话框出现等待时间
+        NEXT_COURSE_DELAY: 1500, // 下一门课前等待时间
+        PAGE_LOAD_DELAY: 2000,   // 页面加载等待时间
 
-        // Auto mode: automatically process all courses
+        // 自动模式
         AUTO_MODE: true,
 
-        // Debug mode: show console logs
+        // 调试模式
         DEBUG: true
     };
 
@@ -118,11 +120,9 @@
         return unevaluated;
     }
 
-    // Select all "完全同意" (Totally Agree) options
+    // Select all "完全同意" (Totally Agree) options - 选择所有"完全同意"选项
     function selectAllTotallyAgree() {
-        let selectedCount = 0;
-
-        // Method 1: Find all labels containing "完全同意" text and click them
+        // 方法1: 查找所有包含"完全同意"文本的label并点击
         const allLabels = document.querySelectorAll('label');
         const targetLabels = [];
 
@@ -133,64 +133,64 @@
             }
         });
 
-        log(`Found ${targetLabels.length} "完全同意" labels`);
+        log(`找到 ${targetLabels.length} 个"完全同意"选项`);
 
-        // Click each label
+        // 逐个点击，每个选项之间有延迟
         targetLabels.forEach((label, index) => {
             setTimeout(() => {
-                // Find the radio input inside or associated with this label
+                // 查找关联的radio input
                 const radio = label.querySelector('input[type="radio"]') ||
                              document.getElementById(label.getAttribute('for'));
 
                 if (radio && !radio.checked) {
-                    // Trigger click on the label (more reliable for custom styled radios)
+                    // 点击label（对自定义样式的radio更可靠）
                     label.click();
-                    selectedCount++;
-                    log(`Clicked option ${index + 1}`);
+                    if (CONFIG.DEBUG) {
+                        console.log(`[FudanEval] 点击选项 ${index + 1}/${targetLabels.length}`);
+                    }
                 } else if (!radio) {
-                    // If no radio found, just click the label
+                    // 如果没有找到radio，直接点击label
                     label.click();
-                    selectedCount++;
-                    log(`Clicked label ${index + 1} (no radio found)`);
                 }
-            }, index * 50); // Small delay between clicks
+            }, index * CONFIG.CLICK_DELAY); // 每个选项之间的延迟
         });
 
-        // Method 2: If method 1 didn't work, try finding by class patterns
+        // 方法2: 如果方法1没有找到，尝试其他选择器
         if (targetLabels.length === 0) {
-            // Try common class patterns for evaluation forms
-            const radioInputs = document.querySelectorAll(
-                'input[type="radio"][value="100"], ' +
-                'input[type="radio"][value="5"], ' +
-                'input[type="radio"]:first-of-type'
-            );
+            log('尝试备选方法查找选项...');
 
-            radioInputs.forEach(radio => {
-                const name = radio.getAttribute('name');
-                // Only click if this is the first (highest value) option in its group
-                const group = document.querySelectorAll(`input[name="${name}"]`);
-                if (group[0] === radio && !radio.checked) {
-                    radio.click();
-                    selectedCount++;
-                }
+            // 查找带有特定value的radio
+            const radioInputs = document.querySelectorAll('input[type="radio"][value="100"]');
+            radioInputs.forEach((radio, index) => {
+                setTimeout(() => {
+                    if (!radio.checked) {
+                        radio.click();
+                    }
+                }, index * CONFIG.CLICK_DELAY);
             });
+
+            if (radioInputs.length > 0) {
+                log(`备选方法找到 ${radioInputs.length} 个选项`);
+                return radioInputs.length;
+            }
         }
 
-        // Method 3: Click by ZeroStar rating component if present
+        // 方法3: ZeroStar 评分组件（如果存在）
         const zeroStarItems = document.querySelectorAll('.zeroStarItem, .star-item');
-        if (zeroStarItems.length > 0) {
+        if (zeroStarItems.length > 0 && targetLabels.length === 0) {
             zeroStarItems.forEach((item, index) => {
-                // Find the highest rating option (usually first or last depending on implementation)
-                const stars = item.querySelectorAll('.star, [class*="star"]');
-                if (stars.length > 0) {
-                    stars[stars.length - 1].click(); // Click highest rating
-                    selectedCount++;
-                }
+                setTimeout(() => {
+                    const stars = item.querySelectorAll('.star, [class*="star"]');
+                    if (stars.length > 0) {
+                        stars[stars.length - 1].click();
+                    }
+                }, index * CONFIG.CLICK_DELAY);
             });
+            log(`ZeroStar方法找到 ${zeroStarItems.length} 个评分项`);
+            return zeroStarItems.length;
         }
 
-        log(`Total selected: ${selectedCount} options`);
-        return selectedCount > 0 ? selectedCount : targetLabels.length;
+        return targetLabels.length;
     }
 
     // Click submit button - 点击提交按钮
@@ -347,46 +347,53 @@
         return false;
     }
 
-    // Process single course evaluation
+    // Process single course evaluation - 处理单个课程评教
     async function processSingleCourse() {
         log('正在处理当前评教表单');
 
-        // Wait for form to load
+        // 等待表单加载
         await sleep(CONFIG.PAGE_LOAD_DELAY);
 
-        // Check if form is visible
+        // 检查表单是否已加载
         const formVisible = document.body.innerHTML.includes('完全同意');
         if (!formVisible) {
-            log('表单未加载，等待...');
-            await sleep(1000);
+            log('表单未加载，继续等待...');
+            await sleep(1500);
         }
 
-        // Select all "完全同意"
+        // 选择所有"完全同意"
         const selectedCount = selectAllTotallyAgree();
-        log(`选中了 ${selectedCount} 个选项`);
+        log(`开始选中选项，预计 ${selectedCount} 项`);
 
-        // Wait for selections to register
-        await sleep(CONFIG.CLICK_DELAY + 200);
+        // 重要：等待所有选项点击完成
+        // 每个选项点击间隔约50ms，加上额外的缓冲时间
+        const waitTime = Math.max(CONFIG.FILL_COMPLETE_DELAY, selectedCount * 100 + 500);
+        log(`等待 ${waitTime}ms 确保所有选项都已选中...`);
+        await sleep(waitTime);
 
-        // Submit the form
+        // 验证选项是否都已选中
+        const checkedCount = document.querySelectorAll('input[type="radio"]:checked, .bh-radio-checked, [class*="checked"]').length;
+        log(`验证：已选中 ${checkedCount} 个选项`);
+
+        // 提交表单
+        log('准备提交表单...');
         const submitted = await submitForm();
 
         if (submitted) {
-            log('表单提交成功');
+            log('表单已提交，等待确认对话框...');
 
-            // Wait for confirmation dialog and handle it
-            await sleep(CONFIG.SUBMIT_DELAY);
+            // 等待确认对话框出现
+            await sleep(CONFIG.CONFIRM_DELAY);
+
+            // 处理确认对话框
             const confirmed = await handleConfirmDialog();
+            log(confirmed ? '确认对话框已处理' : '确认对话框处理可能失败');
 
-            if (confirmed) {
-                log('确认对话框已处理');
-            }
-
-            // Wait for form to close
+            // 等待操作完成
             await sleep(CONFIG.NEXT_COURSE_DELAY);
 
-            // Check if form is still open and close it
-            const closeBtn = Array.from(document.querySelectorAll('a, button')).find(
+            // 检查并关闭可能还开着的表单
+            const closeBtn = Array.from(document.querySelectorAll('a.bh-btn, button')).find(
                 el => el.textContent.trim() === '关闭' && el.offsetParent !== null
             );
             if (closeBtn) {

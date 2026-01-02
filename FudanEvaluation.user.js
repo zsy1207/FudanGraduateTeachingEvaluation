@@ -193,97 +193,110 @@
         return selectedCount > 0 ? selectedCount : targetLabels.length;
     }
 
-    // Click submit button
+    // Click submit button - 点击提交按钮
     async function submitForm() {
-        // Find submit button by multiple selectors
         let submitBtn = null;
 
-        // Try various selectors
-        const selectors = [
-            'a.bh-btn-primary',
-            '.bh-btn-primary',
-            'button.bh-btn-primary',
-            '.pj-form-footer a:nth-child(2)',
-            '.bh-paper-pile-footer a:nth-child(2)'
-        ];
-
-        for (const selector of selectors) {
-            submitBtn = document.querySelector(selector);
-            if (submitBtn && submitBtn.textContent.includes('提交')) {
+        // 方法1: 精确查找 - 底部栏中文本为"提交"的按钮
+        const allBtns = document.querySelectorAll('a.bh-btn, button.bh-btn');
+        for (const btn of allBtns) {
+            if (btn.textContent.trim() === '提交' && btn.offsetParent !== null) {
+                submitBtn = btn;
                 break;
             }
-            submitBtn = null;
         }
 
-        // Fallback: find by text content
+        // 方法2: 通过类名和位置查找
+        if (!submitBtn) {
+            const primaryBtns = document.querySelectorAll('.bh-btn.bh-btn-primary');
+            for (const btn of primaryBtns) {
+                if (btn.textContent.trim() === '提交') {
+                    submitBtn = btn;
+                    break;
+                }
+            }
+        }
+
+        // 方法3: 备选 - 查找任何文本为"提交"的可见链接或按钮
         if (!submitBtn) {
             const allLinks = document.querySelectorAll('a, button');
             submitBtn = Array.from(allLinks).find(el => {
                 const text = el.textContent.trim();
-                return text === '提交' && el.offsetParent !== null; // Visible element
+                return text === '提交' && el.offsetParent !== null;
             });
         }
 
         if (submitBtn) {
-            log('Clicking submit button');
+            log('点击提交按钮');
             submitBtn.click();
             await sleep(CONFIG.SUBMIT_DELAY);
 
-            // Handle confirmation dialog if present
-            await handleConfirmDialog();
+            // 处理确认对话框
+            const confirmed = await handleConfirmDialog();
+            log(confirmed ? '确认对话框已处理' : '等待确认对话框');
+
             return true;
         }
 
-        log('Submit button not found');
+        log('未找到提交按钮');
         return false;
     }
 
-    // Handle confirmation dialog
+    // Handle confirmation dialog - 处理确认对话框
     async function handleConfirmDialog() {
-        // Wait for dialog to appear
+        // 等待对话框出现
         await sleep(800);
 
-        // Look for layui dialog buttons (common in this system)
         let confirmBtn = null;
 
-        // Method 1: layui-layer buttons
+        // 方法1: BH对话框的确定按钮 (精确选择器)
+        confirmBtn = document.querySelector('a.bh-dialog-btn.bh-bg-primary');
+        if (confirmBtn) {
+            log('找到BH对话框确定按钮');
+            confirmBtn.click();
+            await sleep(500);
+            return true;
+        }
+
+        // 方法2: 通过类名查找
+        confirmBtn = document.querySelector('.bh-dialog-btn.bh-bg-primary, .bh-dialog-btn-confirm');
+        if (confirmBtn && confirmBtn.offsetParent !== null) {
+            log('找到确认按钮 (类名匹配)');
+            confirmBtn.click();
+            await sleep(500);
+            return true;
+        }
+
+        // 方法3: layui对话框按钮
         confirmBtn = document.querySelector('.layui-layer-btn0');
         if (confirmBtn) {
-            log('找到 layui 确认按钮');
+            log('找到layui确认按钮');
             confirmBtn.click();
             await sleep(500);
             return true;
         }
 
-        // Method 2: BH dialog
-        confirmBtn = document.querySelector('.bh-dialog-btn-confirm, .bh-btn-primary');
-        if (confirmBtn && confirmBtn.offsetParent !== null) {
-            log('找到 BH 确认按钮');
-            confirmBtn.click();
-            await sleep(500);
-            return true;
-        }
-
-        // Method 3: Find any button with confirm text
-        const allButtons = document.querySelectorAll('a, button, .layui-layer-btn a');
+        // 方法4: 通过文本内容查找"确定"按钮
+        const allButtons = document.querySelectorAll('a.bh-dialog-btn, button, .layui-layer-btn a');
         for (const btn of allButtons) {
             const text = btn.textContent.trim();
-            if ((text === '确定' || text === '确认' || text === '是' || text.includes('确定')) &&
-                btn.offsetParent !== null) {
-                log('找到确认按钮 (文本匹配):', text);
+            if (text === '确定' && btn.offsetParent !== null) {
+                log('找到确定按钮 (文本匹配)');
                 btn.click();
                 await sleep(500);
                 return true;
             }
         }
 
-        // Method 4: Check for layer dialog and click first button
-        const layerBtns = document.querySelectorAll('.layui-layer-btn a');
-        if (layerBtns.length > 0) {
-            log('点击 layer 对话框第一个按钮');
-            layerBtns[0].click();
-            await sleep(500);
-            return true;
+        // 方法5: 备选 - 查找任何包含确定文字的可见按钮
+        const allLinks = document.querySelectorAll('a, button');
+        for (const btn of allLinks) {
+            if (btn.textContent.trim() === '确定' && btn.offsetParent !== null) {
+                log('找到确定按钮 (备选方法)');
+                btn.click();
+                await sleep(500);
+                return true;
+            }
         }
 
         log('未找到确认按钮');
